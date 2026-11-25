@@ -1,0 +1,28 @@
+# 결정 서비스 오토스케일: RPS가 아니라 큐 대기시간(services/decision/main.py가 내보냄).
+# KEDA를 쓰면 같은 Deployment에 HPA를 걸지 않습니다(base의 HPA는 orchestrator 전용).
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: {name: decision, namespace: rag}
+spec:
+  scaleTargetRef: {name: decision}
+  minReplicaCount: 1        # 0은 콜드 스타트 비용이 큰 경우 피합니다
+  maxReplicaCount: 3
+  pollingInterval: 15
+  cooldownPeriod: 300
+  advanced:
+    horizontalPodAutoscalerConfig:
+      behavior:
+        scaleDown: {stabilizationWindowSeconds: 300}
+  triggers:
+    - type: prometheus
+      metadata:
+        serverAddress: http://prometheus.monitoring.svc:9090
+        query: |
+          histogram_quantile(0.9,
+            sum(rate(decision_queue_wait_seconds_bucket{namespace="rag"}[2m])) by (le))
+        threshold: "0.15"       # p90 대기 150ms를 넘으면 늘립니다
+    - type: prometheus
+      metadata:
+        serverAddress: http://prometheus.monitoring.svc:9090
+        query: sum(decision_queue_depth{namespace="rag"})
+        threshold: "8"

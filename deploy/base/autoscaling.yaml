@@ -1,0 +1,21 @@
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: {name: orchestrator}
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: orchestrator}
+  minReplicas: 2
+  maxReplicas: 12
+  metrics:
+    - type: Resource
+      resource: {name: cpu, target: {type: Utilization, averageUtilization: 65}}
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300   # 출렁임 방지
+      policies: [{type: Percent, value: 25, periodSeconds: 60}]
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: {name: orchestrator}
+spec:
+  minAvailable: 1
+  selector: {matchLabels: {app: orchestrator}}

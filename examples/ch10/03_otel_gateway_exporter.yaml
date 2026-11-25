@@ -1,0 +1,7 @@
+# examples/ch10/03_otel_gateway_exporter.yaml
+# 게이트웨이 계층의 exporter에 큐와 재시도를 더합니다(앞 설정에 추가)
+exporters:
+  otlphttp/tempo:
+    endpoint: http://tempo.monitoring:4318
+    retry_on_failure: {enabled: true, initial_interval: 2s, max_interval: 30s}
+    sending_queue: {enabled: true, num_consumers: 8, queue_size: 5000}

@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: Service
+metadata: {name: generator}
+spec: {selector: {app: generator}, ports: [{name: http, port: 8080}]}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: generator}
+spec:
+  replicas: 2
+  selector: {matchLabels: {app: generator}}
+  template:
+    metadata: {labels: {app: generator}}
+    spec:
+      containers:
+        - name: generator
+          image: rag/generator:0.9.0
+          ports: [{containerPort: 8080}]
+          envFrom: [{configMapRef: {name: rag-config}}]
+          env:
+            # 생성 서비스만 외부 LLM 주소를 받습니다. 공용 ConfigMap에 OPENAI_BASE_URL을 두면
+            # 오케스트레이터가 생성 서비스를 건너뛰고 LLM을 직접 부르게 되므로 키 이름을 따로 둡니다.
+            - name: OPENAI_BASE_URL
+              valueFrom: {configMapKeyRef: {name: rag-config, key: GENERATOR_UPSTREAM_URL, optional: true}}
+            - name: GENERATOR_API_KEY
+              valueFrom: {secretKeyRef: {name: rag-secrets, key: GENERATOR_API_KEY, optional: true}}
+          resources:
+            requests: {cpu: 200m, memory: 256Mi}
+            limits: {cpu: "1", memory: 512Mi}
+          readinessProbe: {httpGet: {path: /healthz, port: 8080}, periodSeconds: 5}

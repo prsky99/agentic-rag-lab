@@ -1,0 +1,40 @@
+# 초기 적재 Job. 끝난 뒤 decision 파드가 같은 PVC를 읽기 전용으로 마운트합니다.
+# 마운트 기준을 decision 파드와 같게 맞춥니다: PVC 루트 = /models/openjev = 모델 파일 위치.
+# (이전에는 Job이 PVC를 /models에 붙이고 /models/openjev에 받아 PVC 안에 openjev/가 한 단계
+#  더 생겼고, PVC 루트를 /models/openjev에 붙이는 decision 파드에서는 /models/openjev/openjev/가
+#  되어 vLLM이 config.json을 찾지 못했습니다.)
+# [재현 경고] MODEL_REVISION의 기본값 "main"은 실습 편의용입니다. main은 저장소가 갱신되면
+# 다른 가중치·helper를 가리키므로, 같은 결과를 재현하려면 반드시 허깅페이스 저장소의 커밋 해시
+# (40자)로 바꿔 주세요. 해시 조회:
+#   curl -s https://huggingface.co/api/models/openjev/openjev | jq -r .sha
+# (2026-11-25 조회 시 main = b4a89f5884f3482a5e894b2e7ff01db8ea033726. 적용 시점에 다시 확인해 주세요.)
+# shim 이미지(deploy/decision/shim/Dockerfile)의 MODEL_REVISION도 같은 해시로 맞춥니다.
+# 이미지 python:3.12-slim은 패치 버전이 움직이는 태그입니다. 고정하려면 README 8절의 방법대로
+# 다이제스트(python:3.12-slim@sha256:...)로 적어 주세요.
+apiVersion: batch/v1
+kind: Job
+metadata: {name: openjev-download, namespace: rag}
+spec:
+  backoffLimit: 4
+  template:
+    metadata:
+      labels: {app: openjev-download}   # 11-decision-netpol.yaml의 외부 HTTPS 허용 대상
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: hf
+          image: python:3.12-slim
+          command: ["sh", "-c"]
+          env:
+            - {name: MODEL_REPO, value: "openjev/openjev"}
+            - {name: MODEL_REVISION, value: "main"}       # 재현하려면 커밋 해시(40자)로 교체
+            - {name: HF_HOME, value: /tmp/hf}
+          args:
+            - >-
+              pip install -q huggingface_hub==0.35.3 &&
+              hf download "$MODEL_REPO" --revision "$MODEL_REVISION" --local-dir /models/openjev &&
+              test -f /models/openjev/config.json
+          volumeMounts: [{name: w, mountPath: /models/openjev}]
+      volumes:
+        - name: w
+          persistentVolumeClaim: {claimName: openjev-weights}

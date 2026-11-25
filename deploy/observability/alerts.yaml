@@ -1,0 +1,33 @@
+groups:
+- name: rag-slo
+  rules:
+  - alert: RagHighErrorBurn
+    expr: |
+      (sum(rate(rag_requests_total{status=~"5.."}[1h])) / sum(rate(rag_requests_total[1h]))) > (14.4 * 0.005)
+    for: 10m
+    labels: {severity: page}
+    annotations: {summary: "5xx 번레이트가 에러 버짓의 14.4배", runbook_url: "docs/runbooks/rollback.md"}
+  - alert: RagP95Slow
+    expr: |
+      histogram_quantile(0.95, sum(rate(rag_request_duration_seconds_bucket[5m])) by (le)) > 3
+    for: 15m
+    labels: {severity: page}
+    annotations: {summary: "RagP95Slow", runbook_url: "docs/runbooks/decision-down.md"}
+  - alert: RagAbstainSpike
+    expr: |
+      sum(rate(rag_abstain_total[10m])) / sum(rate(rag_requests_total[10m])) > 0.20
+    for: 10m
+    labels: {severity: ticket}
+    annotations: {summary: "RagAbstainSpike", runbook_url: "docs/runbooks/retrieval-quality.md"}
+  - alert: RagCostPerQueryHigh
+    expr: |
+      sum(rate(rag_cost_krw_total[30m])) / sum(rate(rag_requests_total[30m])) > 20
+    for: 30m
+    labels: {severity: ticket}
+    annotations: {summary: "RagCostPerQueryHigh", runbook_url: "docs/runbooks/rollback.md"}
+  - alert: DecisionQueueWait
+    expr: |
+      histogram_quantile(0.9, sum(rate(decision_queue_wait_seconds_bucket[5m])) by (le)) > 0.2
+    for: 10m
+    labels: {severity: ticket}
+    annotations: {summary: "DecisionQueueWait", runbook_url: "docs/runbooks/decision-down.md"}

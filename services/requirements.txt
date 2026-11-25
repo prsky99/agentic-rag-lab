@@ -1,0 +1,17 @@
+# 서비스 이미지 전용 의존성 (services/*/Dockerfile이 설치합니다).
+# 루트 requirements.txt에서 sentence-transformers만 뺐습니다. sentence-transformers는
+# GPU용 torch(CUDA 라이브러리 수 GB)를 끌고 와서 이미지 7개가 모두 수 GB가 되고,
+# kind load가 노드 3개에 그만큼 복사해야 합니다. 교차 인코더가 필요한 reranker만
+# CPU용 torch와 함께 따로 설치합니다(services/reranker/Dockerfile).
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+httpx==0.28.1
+pydantic==2.10.4
+PyJWT[crypto]==2.10.1
+PyYAML==6.0.2
+qdrant-client==1.20.0
+fastembed==0.4.2
+opentelemetry-api==1.29.0
+opentelemetry-sdk==1.29.0
+opentelemetry-exporter-otlp-proto-http==1.29.0
+prometheus-client==0.21.1

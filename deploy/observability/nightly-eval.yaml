@@ -1,0 +1,26 @@
+# 야간 평가 (10.8절) — 코퍼스 드리프트 감지.
+# 선택 구성: 평가 이미지(저장소 + requirements-eval.txt + 인덱스 스냅샷)를 만들어
+# image를 바꾼 뒤 적용합니다. 결과 보관(PVC·객체 저장소)과 메트릭 노출
+# (rag_eval_correct_ratio 등, Pushgateway 등)은 환경에 맞게 붙입니다.
+#   kubectl apply -n rag -f deploy/observability/nightly-eval.yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata: {name: rag-nightly-eval, namespace: rag}
+spec:
+  schedule: "0 3 * * *"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: eval
+              image: registry.example.com/rag-eval:1.4.0
+              command: ["python", "eval/run_subset.py",
+                        "--subset", "eval/ci/nightly_subset.json",
+                        "--out", "/reports/nightly.json"]
+              volumeMounts: [{name: reports, mountPath: /reports}]
+          volumes:
+            - name: reports
+              emptyDir: {}

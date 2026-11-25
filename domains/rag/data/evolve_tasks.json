@@ -1,0 +1,212 @@
+[
+  {
+    "id": "q_0001",
+    "question": "환불은 결제일로부터 며칠 이내에 요청할 수 있나요?",
+    "tenant": "acme"
+  },
+  {
+    "id": "q_0002",
+    "question": "개봉한 상품은 며칠 이내에 환불할 수 있나요?",
+    "tenant": "acme"
+  },
+  {
+    "id": "q_0003",
+    "question": "환불 검토와 환급은 각각 며칠이 걸리나요?",
+    "tenant": "acme"
+  },
+  {
+    "id": "q_0004",
+    "question": "카드 환불은 추가로 며칠이 걸릴 수 있나요?",
+    "tenant": "acme"
+  },
+  {
+    "id": "q_0005",
+    "question": "디지털 콘텐츠는 어떤 조건에서 환불되나요?",
+    "tenant": "acme"
+  },
+  {
+    "id": "q_0006",
+    "question": "이미 사용한 이용권은 어떻게 환불되나요?",
+    "tenant": "acme"
+  },
+  {
+    "id": "q_0007",
+    "question": "같은 결제 건을 두 번 환불받을 수 있나요?",
+    "tenant": "acme"
+  },
+  {
+    "id": "q_0008",
+    "question": "환불이 불가능한 항목은 무엇인가요?",
+    "tenant": "acme"
+  },
+  {
+    "id": "q_0009",
+    "question": "Free 플랜은 분당 몇 회까지 호출할 수 있나요?",
+    "tenant": "acme"
+  },
+  {
+    "id": "q_0010",
+    "question": "Enterprise 플랜의 분당 호출 한도는 몇 회인가요?",
+    "tenant": "acme"
+  },
+  {
+    "id": "q_0011",
+    "question": "호출 한도를 넘으면 어떤 응답이 오나요?",
+    "tenant": "acme"
+  },
+  {
+    "id": "q_0012",
+    "question": "한도 초과 후 재시도는 어떻게 해야 하나요?",
+    "tenant": "acme"
+  },
+  {
+    "id": "q_0013",
+    "question": "버스트는 얼마나 허용되나요?",
+    "tenant": "acme"
+  },
+  {
+    "id": "q_0014",
+    "question": "API 키는 얼마마다 회전하나요?",
+    "tenant": "acme"
+  },
+  {
+    "id": "q_0015",
+    "question": "키 회전 후 이전 키는 언제까지 유효한가요?",
+    "tenant": "acme"
+  },
+  {
+    "id": "q_0016",
+    "question": "Free 플랜의 1차 응답 목표 시간은 얼마인가요?",
+    "tenant": "acme"
+  },
+  {
+    "id": "q_0017",
+    "question": "Enterprise의 1차 응답 목표는 몇 시간인가요?",
+    "tenant": "acme"
+  },
+  {
+    "id": "q_0018",
+    "question": "전담 기술 매니저는 어느 플랜에 배정되나요?",
+    "tenant": "acme"
+  },
+  {
+    "id": "q_0019",
+    "question": "지원 범위에 포함되지 않는 작업은 무엇인가요?",
+    "tenant": "acme"
+  },
+  {
+    "id": "q_0020",
+    "question": "야간에 SEV1 장애가 나면 어떻게 대응하나요?",
+    "tenant": "acme"
+  },
+  {
+    "id": "q_0021",
+    "question": "SEV1과 SEV2는 어떻게 구분하나요?",
+    "tenant": "acme"
+  },
+  {
+    "id": "q_0022",
+    "question": "SEV1이 발생하면 상태 페이지는 언제 갱신하나요?",
+    "tenant": "acme"
+  },
+  {
+    "id": "q_0023",
+    "question": "배포 후 언제 롤백하나요?",
+    "tenant": "acme"
+  },
+  {
+    "id": "q_0024",
+    "question": "SEV1 사후 분석 문서는 언제까지 작성하나요?",
+    "tenant": "acme"
+  },
+  {
+    "id": "q_0025",
+    "question": "2031년 우주 정거장 예산은 얼마인가요?",
+    "tenant": "acme"
+  },
+  {
+    "id": "q_0026",
+    "question": "우리 회사의 2027년 인건비 총액은 얼마인가요?",
+    "tenant": "acme"
+  },
+  {
+    "id": "q_0027",
+    "question": "지원은 어떤 언어로 제공되고, 일본어 문의는 응답이 얼마나 늦어지나요?",
+    "tenant": "acme"
+  },
+  {
+    "id": "q_0028",
+    "question": "사용량 알림은 분당 한도의 몇 %에서 오나요?",
+    "tenant": "acme"
+  },
+  {
+    "id": "q_0029",
+    "question": "한도 상향 신청의 검토 결과는 언제 알려 주나요?",
+    "tenant": "acme"
+  },
+  {
+    "id": "q_0030",
+    "question": "문의는 어디에서 접수하나요?",
+    "tenant": "acme"
+  },
+  {
+    "id": "q_0031",
+    "question": "장애 대응 훈련은 얼마나 자주 하나요?",
+    "tenant": "acme"
+  },
+  {
+    "id": "q_0032",
+    "question": "훈련 결과는 언제 런북에 반영하나요?",
+    "tenant": "acme"
+  },
+  {
+    "id": "q_0033",
+    "question": "사옥 주차장은 몇 면인가요?",
+    "tenant": "acme"
+  },
+  {
+    "id": "q_0034",
+    "question": "한도 상향은 어디서 신청하고, 신청할 수 없는 플랜은 무엇인가요?",
+    "tenant": "acme"
+  },
+  {
+    "id": "q_0035",
+    "question": "Pro 플랜의 월 요금은 얼마인가요?",
+    "tenant": "acme"
+  },
+  {
+    "id": "q_0036",
+    "question": "연 결제하면 얼마나 할인되나요?",
+    "tenant": "acme"
+  },
+  {
+    "id": "q_0037",
+    "question": "Enterprise의 초과 호출 요금은 1,000회당 얼마인가요?",
+    "tenant": "acme"
+  },
+  {
+    "id": "q_0038",
+    "question": "스타트업 할인과 비영리 할인을 함께 받을 수 있나요?",
+    "tenant": "acme"
+  },
+  {
+    "id": "q_0039",
+    "question": "환불을 빨리 받으려면 무엇을 확인해야 하나요?",
+    "tenant": "acme"
+  },
+  {
+    "id": "q_0040",
+    "question": "요금제를 올리면 지원 응답이 얼마나 빨라지나요?",
+    "tenant": "acme"
+  },
+  {
+    "id": "q_0041",
+    "question": "장애가 났을 때 고객에게 언제 알리나요?",
+    "tenant": "acme"
+  },
+  {
+    "id": "q_0042",
+    "question": "API를 너무 많이 호출하면 어떤 제한이 걸리나요?",
+    "tenant": "acme"
+  }
+]

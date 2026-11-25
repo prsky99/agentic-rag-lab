@@ -1,0 +1,118 @@
+# 기본 거부 후 필요한 것만 엽니다 (11.2절 3층).
+# - 포트는 Service 포트가 아니라 **파드(컨테이너) 포트**를 적습니다(decision: 8000 → 8080).
+# - 네임스페이스는 쿠버네티스가 자동으로 붙이는 kubernetes.io/metadata.name 라벨로 고릅니다.
+# - 정책은 CNI가 집행할 때만 효과가 있습니다. kind는 kindnet, GKE는 Dataplane V2
+#   (--enable-dataplane-v2)나 Calico(--enable-network-policy)가 켜져 있어야 합니다.
+# - 이 파일의 진입 허용(allow-ingress-gateway)은 kind의 ingress-nginx 기준입니다. GKE에서는
+#   deploy/overlays/gke/networkpolicy-gke.yaml이 GCE 부하 분산기 대역으로 바꿉니다.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: default-deny, namespace: rag}
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+# 모든 파드가 클러스터 DNS만은 조회할 수 있어야 서비스 이름이 풀립니다.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: allow-dns, namespace: rag}
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+    - to: [{namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: kube-system}}}]
+      ports: [{protocol: UDP, port: 53}, {protocol: TCP, port: 53}]
+---
+# 같은 네임스페이스 안의 파드끼리는 들어올 수 있습니다. 누가 어디로 나갈 수 있는지는
+# 아래 egress 규칙이 서비스별로 정합니다. NetworkPolicy는 합집합이므로 decision은
+# 이 규칙에서 빼고, orchestrator에서 오는 요청만 따로 엽니다.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: allow-intra-namespace-ingress, namespace: rag}
+spec:
+  podSelector:
+    matchExpressions:
+      - {key: app, operator: NotIn, values: [decision]}
+  policyTypes: [Ingress]
+  ingress:
+    - from: [{podSelector: {}}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: allow-orchestrator-to-decision, namespace: rag}
+spec:
+  podSelector: {matchLabels: {app: decision}}
+  policyTypes: [Ingress]
+  ingress:
+    - from: [{podSelector: {matchLabels: {app: orchestrator}}}]
+      ports: [{protocol: TCP, port: 8080}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: allow-ingress-gateway, namespace: rag}
+spec:
+  podSelector: {matchLabels: {app: gateway}}
+  policyTypes: [Ingress]
+  ingress:
+    - from: [{namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: ingress-nginx}}}]
+      ports: [{protocol: TCP, port: 8080}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: gateway-egress, namespace: rag}
+spec:
+  podSelector: {matchLabels: {app: gateway}}
+  policyTypes: [Egress]
+  egress:
+    - to: [{podSelector: {matchLabels: {app: orchestrator}}}]
+      ports: [{protocol: TCP, port: 8080}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: orchestrator-egress, namespace: rag}
+spec:
+  podSelector: {matchLabels: {app: orchestrator}}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - podSelector:
+            matchExpressions:
+              - {key: app, operator: In, values: [decision, retriever, reranker, generator, guard]}
+      ports: [{protocol: TCP, port: 8080}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: retriever-egress, namespace: rag}
+spec:
+  podSelector: {matchLabels: {app: retriever}}
+  policyTypes: [Egress]
+  egress:
+    - to: [{podSelector: {matchLabels: {app: qdrant}}}]
+      ports: [{protocol: TCP, port: 6333}]
+---
+# 모든 파드 → OTel Collector(4317 gRPC, 4318 HTTP). 서비스는 4318(OTLP/HTTP)로 보냅니다.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: allow-otel-egress, namespace: rag}
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+    - to: [{podSelector: {matchLabels: {app: otel-collector}}}]
+      ports: [{protocol: TCP, port: 4317}, {protocol: TCP, port: 4318}]
+---
+# Prometheus가 /metrics(컨테이너 포트 8080)를 긁을 수 있게 엽니다. 막히면 decision의
+# 큐 지표가 끊겨 KEDA 자동 확장이 멈춥니다(deploy/decision/20-keda.yaml).
+# monitoring: kube-prometheus 등 직접 설치한 Prometheus, gmp-system: GKE 관리형 Prometheus.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: allow-metrics-scrape, namespace: rag}
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: monitoring}}
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: gmp-system}}
+      ports: [{protocol: TCP, port: 8080}]
+# 생성 모델이 외부 API라면 generator에 해당 도메인·IP만 여는 egress를 오버레이에서 더합니다.

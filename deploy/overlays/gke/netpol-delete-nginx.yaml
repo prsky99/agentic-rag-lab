@@ -1,0 +1,6 @@
+# GKE에는 ingress-nginx가 없으므로 base의 nginx 전용 진입 허용을 지웁니다.
+# 대신 networkpolicy-gke.yaml의 allow-gclb-to-gateway가 부하 분산기 대역을 엽니다.
+$patch: delete
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: allow-ingress-gateway, namespace: rag}

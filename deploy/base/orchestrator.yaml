@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: Service
+metadata: {name: orchestrator}
+spec:
+  selector: {app: orchestrator}
+  ports: [{name: http, port: 8080}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orchestrator
+  labels: {app.kubernetes.io/version: harness-9f2c1ab}
+spec:
+  replicas: 2
+  strategy:
+    rollingUpdate: {maxSurge: 1, maxUnavailable: 0}
+  selector: {matchLabels: {app: orchestrator}}
+  template:
+    metadata: {labels: {app: orchestrator}}
+    spec:
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: orchestrator
+          image: rag/orchestrator:harness-9f2c1ab
+          ports: [{containerPort: 8080}]
+          envFrom: [{configMapRef: {name: rag-config}}]
+          env:
+            - name: JWT_PUBLIC_KEY
+              valueFrom: {secretKeyRef: {name: rag-secrets, key: JWT_PUBLIC_KEY, optional: true}}
+            - name: INTERNAL_TOKEN
+              valueFrom: {secretKeyRef: {name: rag-secrets, key: INTERNAL_TOKEN, optional: true}}
+          resources:
+            requests: {cpu: 400m, memory: 512Mi}
+            limits: {cpu: "2", memory: 1Gi}
+          readinessProbe: {httpGet: {path: /ready, port: 8080}, periodSeconds: 5}
+          livenessProbe: {httpGet: {path: /healthz, port: 8080}, periodSeconds: 15}
+          lifecycle: {preStop: {exec: {command: ["sh", "-c", "sleep 5"]}}}

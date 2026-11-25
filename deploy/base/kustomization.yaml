@@ -1,0 +1,26 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: rag
+resources:
+  - namespace.yaml
+  - qdrant.yaml
+  - decision.yaml
+  - retriever.yaml
+  - reranker.yaml
+  - generator.yaml
+  - guard.yaml
+  - orchestrator.yaml
+  - gateway.yaml
+  - ingress.yaml
+  - autoscaling.yaml
+  - pdb.yaml
+  - networkpolicy.yaml
+  - otel.yaml
+# rag-config는 파일(configmap.yaml)이 아니라 생성기로 만듭니다. 이름 끝에 내용 해시가 붙어
+# (rag-config-<해시>) 값이 바뀌면 이름이 바뀌고, 이를 참조하는 Deployment가 롤링 재시작됩니다.
+# 오버레이에서 값 하나만 바꾸려면 같은 이름의 생성기를 behavior: merge로 더합니다.
+configMapGenerator:
+  - name: rag-config
+    envs: [rag-config.env]
+commonLabels:
+  app.kubernetes.io/part-of: agentic-rag

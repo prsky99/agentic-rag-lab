@@ -1,0 +1,8 @@
+# examples/ch11/04_namespace.yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: rag
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted

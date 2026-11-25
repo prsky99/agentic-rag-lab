@@ -1,0 +1,13 @@
+# kind 로컬: 결정 모델은 CPU 프록시 1개로 충분합니다(로컬 대체 판정).
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: decision}
+spec:
+  replicas: 1
+  template:
+    spec:
+      containers:
+        - name: decision
+          resources:
+            requests: {cpu: 100m, memory: 256Mi}
+            limits: {cpu: "1", memory: 1Gi}

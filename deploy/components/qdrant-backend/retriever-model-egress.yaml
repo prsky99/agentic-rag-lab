@@ -1,0 +1,18 @@
+# retriever → 외부 HTTPS(443). 임베딩 모델 파일을 내려받는 통신입니다(Qdrant 백엔드 전용).
+# base의 retriever-egress는 Qdrant(6333)만 열어 두므로, 이 규칙이 없으면 기본 거부에 막혀
+# 모델을 받지 못하고 /ready가 통과하지 않습니다. 사설 대역은 제외합니다.
+# GKE 오버레이의 allow-workload-identity가 이미 retriever의 443을 열어 두지만, 그 규칙이 바뀌어도
+# 모델 내려받기가 끊기지 않도록 같은 통로를 이 묶음에도 둡니다(NetworkPolicy는 합집합입니다).
+# 모델을 이미지에 넣어 EMBED_LOCAL_FILES_ONLY=1로 돌리면 이 규칙은 필요 없습니다.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: retriever-model-download-egress, namespace: rag}
+spec:
+  podSelector: {matchLabels: {app: retriever}}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except: [10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16]
+      ports: [{protocol: TCP, port: 443}]

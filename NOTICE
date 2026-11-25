@@ -1,0 +1,12 @@
+agentic-rag-lab
+Copyright 2026 한태석
+
+이 저장소는 책 『클라우드 네이티브 쿠버네티스 기반 차세대 Agentic RAG 구축 — 로컬 Jev + 구글 RRSI 적용』의
+동봉 코드입니다. 코드는 Apache License 2.0(LICENSE 파일)으로 제공합니다.
+
+- 책의 본문 글·도판·표는 이 라이선스의 대상이 아닙니다. 책의 저작권과 이용 조건은 책 12장 판권 안내를 따릅니다.
+- rrsi/ 디렉터리는 Google Research의 RRSI(github.com/google-research/rrsi, Apache License 2.0) 구조를 참고해
+  이 책을 위해 새로 작성한 교육용 구현입니다. 업스트림 코드를 옮겨 온 것이 아닙니다.
+- 이 저장소가 내려받아 쓰는 제3자 구성 요소와 모델은 각자의 라이선스를 따릅니다.
+  특히 OpenJev 모델 가중치는 CC BY-NC 4.0(비상업)이며, 이 저장소의 코드 라이선스와 별개입니다.
+- Jev는 TypeSafe의 제품·상표입니다. 이 저장소는 공개된 API 계약을 독립적으로 구현·설명한 것입니다.

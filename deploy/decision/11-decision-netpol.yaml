@@ -1,0 +1,33 @@
+# decision 진입은 orchestrator만. 포트는 파드(컨테이너) 포트 8080.
+# NetworkPolicy는 합집합입니다. 네임스페이스 전체 허용 규칙이 decision 파드를 덮으면
+# 이 정책만으로는 제한되지 않으므로, 그 규칙에서 decision을 빼야 합니다(11.2절).
+# 단, Prometheus의 지표 수집(/metrics, 8080)은 열어야 KEDA가 큐 지표를 받습니다.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: decision-ingress, namespace: rag}
+spec:
+  podSelector: {matchLabels: {app: decision}}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector: {matchLabels: {app: orchestrator}}
+      ports: [{port: 8080, protocol: TCP}]
+    - from:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: monitoring}}
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: gmp-system}}
+      ports: [{port: 8080, protocol: TCP}]
+---
+# 가중치 다운로드 Job은 기본 거부(default-deny) 아래에서 외부로 나갈 수 없습니다.
+# pip(PyPI)와 허깅페이스(CDN 포함)에 HTTPS로만 나가도록 엽니다. 사설 대역은 제외합니다.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: openjev-download-egress, namespace: rag}
+spec:
+  podSelector: {matchLabels: {app: openjev-download}}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except: [10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16]
+      ports: [{protocol: TCP, port: 443}]

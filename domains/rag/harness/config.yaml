@@ -1,0 +1,60 @@
+# 하네스 설정 — 진화가 건드릴 수 있는 수치의 단일 출처 (8.1절)
+# RRSI 제안자는 이 파일의 스칼라 값을 바꿉니다. 주석의 기본값은 12장 기준입니다.
+retrieval:
+  backend: auto              # auto | local | http  (auto: RETRIEVER_URL 있으면 http)
+  corpus_dir: ../data/corpus
+  service_url: ""             # kind: http://retriever:8080
+  top_k: 40                   # 리랭킹 전 후보
+  final_k: 8                  # 생성에 넣는 문단 수
+  bm25_weight: 0.45
+  vector_weight: 0.55
+  rrf_k: 60
+  # 개발용 테넌트 별칭. 운영에서는 ingestion이 실제 테넌트로 색인하므로 비워 둡니다.
+  tenant_aliases:
+    demo: [acme]
+    other: [globex]
+
+rerank:
+  enabled: false              # true: 교차 인코더 사용(처음 실행 때 모델을 내려받습니다, 약 2GB)
+  model: BAAI/bge-reranker-v2-m3  # false이거나 모델을 읽지 못하면 어휘 점수로 정렬합니다
+  top_n: 20
+
+gates:
+  g1_floor: 0.60
+  g2_floor: 0.65
+  g2_rewrite_band: [0.30, 0.65]
+  g3_floor: 0.70
+  max_rewrites: 1
+
+context:
+  order: relevance_desc       # relevance_desc | relevance_asc | doc_order
+  max_chars: 12000
+  dedup_threshold: 0.92
+  keep_tables: true
+
+budget:
+  deadline_ms: 6000
+  max_gate_calls: 5
+  max_generation_calls: 2
+
+rewrite:
+  synonyms:
+    반품: 환불
+    환급: 환불
+    리밋: 한도
+    레이트리밋: 호출 한도
+    응대: 응답
+    장애대응: 장애 대응
+
+generation:
+  mode: auto                  # auto | remote | extractive
+  base_url: ""                # 비우면 OPENAI_BASE_URL
+  model: gpt-6-luna
+  api_key: ""
+  decision_mode: auto         # auto | remote | local | offline
+  decision_base_url: ""       # 클러스터: http://decision:8000 (Service 8000 → 컨테이너 8080). 비우면 DECISION_BASE_URL
+  decision_model: jev-1.13.0
+  index_snapshot: idx-2026-11-20
+
+policy:
+  version: rag-harness-0.1.0

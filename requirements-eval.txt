@@ -1,0 +1,5 @@
+# 평가 전용. CI(GitHub 호스팅 러너 ubuntu-latest, .github/workflows/rag-regression.yml)에서 설치합니다.
+-r requirements.txt
+pytest==8.3.4
+ragas==0.4.4
+openai==1.59.6

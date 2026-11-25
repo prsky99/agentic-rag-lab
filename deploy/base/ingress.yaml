@@ -1,0 +1,16 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: rag
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "30"
+    nginx.ingress.kubernetes.io/limit-rps: "50"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: rag.localtest.me        # *.localtest.me는 127.0.0.1로 해석됩니다
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend: {service: {name: gateway, port: {number: 80}}}

@@ -1,0 +1,15 @@
+# 코어 하네스는 표준 라이브러리만으로 돕니다(로컬 대체 모드).
+# 아래는 서비스·검색·서빙에 필요한 고정 버전입니다.
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+httpx==0.28.1
+pydantic==2.10.4
+PyJWT[crypto]==2.10.1
+PyYAML==6.0.2
+qdrant-client==1.20.0
+fastembed==0.4.2
+sentence-transformers==3.3.1
+opentelemetry-api==1.29.0
+opentelemetry-sdk==1.29.0
+opentelemetry-exporter-otlp-proto-http==1.29.0
+prometheus-client==0.21.1

@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: Service
+metadata: {name: qdrant}
+spec:
+  selector: {app: qdrant}
+  ports: [{name: http, port: 6333}, {name: grpc, port: 6334}]
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata: {name: qdrant}
+spec:
+  serviceName: qdrant
+  replicas: 1
+  selector: {matchLabels: {app: qdrant}}
+  template:
+    metadata: {labels: {app: qdrant}}
+    spec:
+      securityContext: {runAsNonRoot: true, runAsUser: 1000, fsGroup: 1000}
+      # 이미지 기본 UID를 확인하고 fsGroup을 맞춥니다. 불일치하면 PVC 쓰기에서 실패합니다.
+      # 기본 이미지(qdrant/qdrant:v1.20.2)는 root 소유 /qdrant에 snapshots를 만들려다
+      # UID 1000에서 Permission denied로 멈춥니다. UID 1000으로 도는 -unprivileged 태그를 씁니다.
+      containers:
+        - name: qdrant
+          image: qdrant/qdrant:v1.20.2-unprivileged
+          ports: [{containerPort: 6333}, {containerPort: 6334}]
+          resources:
+            requests: {cpu: 500m, memory: 1Gi}
+            limits: {cpu: "2", memory: 4Gi}
+          volumeMounts:
+            - {name: data, mountPath: /qdrant/storage}
+          readinessProbe:
+            httpGet: {path: /healthz, port: 6333}
+            periodSeconds: 5
+  volumeClaimTemplates:
+    - metadata: {name: data}
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources: {requests: {storage: 20Gi}}

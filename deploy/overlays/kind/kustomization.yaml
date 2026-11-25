@@ -1,0 +1,14 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources: [../../base]
+patches:
+  - path: decision-cpu.yaml
+  - path: ingress-host.yaml
+images:
+  - {name: rag/orchestrator, newName: rag/orchestrator, newTag: dev}
+  - {name: rag/gateway, newName: rag/gateway, newTag: dev}
+  - {name: rag/retriever, newName: rag/retriever, newTag: dev}
+  - {name: rag/reranker, newName: rag/reranker, newTag: dev}
+  - {name: rag/generator, newName: rag/generator, newTag: dev}
+  - {name: rag/guard, newName: rag/guard, newTag: dev}
+  - {name: rag/decision, newName: rag/decision, newTag: dev}

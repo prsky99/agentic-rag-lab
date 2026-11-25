@@ -1,0 +1,13 @@
+# examples/ch10/02_otel_agent_loadbalancing.yaml
+# 에이전트(DaemonSet) 설정의 핵심 — 개념 예시
+exporters:
+  loadbalancing:
+    routing_key: traceID
+    protocol:
+      otlp:
+        tls: {insecure: true}
+    resolver:
+      static:
+        hostnames:
+          - otel-gateway-0.otel-gateway.rag.svc:4317
+          - otel-gateway-1.otel-gateway.rag.svc:4317

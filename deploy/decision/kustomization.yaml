@@ -1,0 +1,14 @@
+# 4장: GKE 오버레이 위에 OpenJev(H100 80GB) 결정 서비스를 더합니다.
+#   kubectl apply -k deploy/decision
+# 2장 GKE 오버레이(decision-gpu.yaml)의 L4 24GB는 경량 결정 모델/자체 헤드용입니다.
+# OpenJev FP8(약 29GB)은 L4에 들어가지 않으므로 여기서 H100 노드로 올립니다.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../overlays/gke
+  - 00-weights-pvc.yaml
+  - 05-weights-download.yaml
+  - 11-decision-netpol.yaml
+  - 20-keda.yaml
+patches:
+  - path: 10-decision.yaml

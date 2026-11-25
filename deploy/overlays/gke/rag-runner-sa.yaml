@@ -1,0 +1,8 @@
+# Workload Identity로 GCP 서비스 계정에 연결되는 쿠버네티스 서비스 계정 (2.4절).
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: rag-runner
+  namespace: rag
+  annotations:
+    iam.gke.io/gcp-service-account: rag-runner@PROJECT.iam.gserviceaccount.com

@@ -1,0 +1,10 @@
+# examples/ch02/01_cloudbuild_digest.yaml
+# Cloud Build 발췌 — 태그가 아니라 digest로 고정합니다
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args: ["build", "-t", "asia-northeast3-docker.pkg.dev/$PROJECT_ID/rag/orchestrator:$SHORT_SHA",
+           "-f", "services/orchestrator/Dockerfile", "."]
+  - name: gcr.io/cloud-builders/docker
+    args: ["push", "asia-northeast3-docker.pkg.dev/$PROJECT_ID/rag/orchestrator:$SHORT_SHA"]
+images:
+  - asia-northeast3-docker.pkg.dev/$PROJECT_ID/rag/orchestrator:$SHORT_SHA

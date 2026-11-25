@@ -1,0 +1,25 @@
+name: rag-regression
+on: pull_request
+# 외부 기여자의 PR 코드가 실행되므로 자체 호스팅 러너(지속형 자원·자격 증명)를 쓰지 않습니다.
+# 평가는 저장소 안의 코드·데이터만으로 실행되므로 GitHub 호스팅 러너에서 충분합니다.
+permissions:
+  contents: read
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - run: pip install -r requirements-eval.txt
+      - run: |
+          python eval/run_subset.py --subset eval/ci/regression_subset.json \
+            --out /tmp/report.json
+      # 기준선(eval/reports/base_ragas.json)·필수 지표·표본 수가 없거나 문항 목록이 다르면 실패합니다.
+      - run: |
+          python eval/check_thresholds.py /tmp/report.json \
+            --baseline eval/reports/base_ragas.json \
+            --max-correct-drop 0.01 --max-cite-drop 0.02 --max-abstain-drop 0.03 \
+            --max-error-rise 0.01 --item-regressions
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with: {name: rag-eval-report, path: /tmp/report.json}

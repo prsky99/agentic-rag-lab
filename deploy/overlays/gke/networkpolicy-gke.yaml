@@ -1,0 +1,64 @@
+# GKE 전용 네트워크 정책 (11.2절). base의 기본 거부 정책 위에 GKE에서만 필요한 통로를 엽니다.
+#
+# 집행 전제: 클러스터를 Dataplane V2로 만듭니다(gcloud ... --enable-dataplane-v2).
+# Dataplane V2가 아니고 --enable-network-policy(Calico)도 꺼져 있으면 NetworkPolicy는
+# 조용히 무시됩니다. 확인: gcloud container clusters describe rag-prod --region asia-northeast3 \
+#   --format="value(networkConfig.datapathProvider)"   → ADVANCED_DATAPATH
+#
+# 1) 진입: GCE Ingress(외부 애플리케이션 부하 분산기)는 컨테이너 기반 부하 분산(NEG)으로
+#    파드에 직접 들어옵니다. 요청과 상태 검사 모두 Google 프런트엔드·상태 검사 대역
+#    35.191.0.0/16, 130.211.0.0/22에서 오므로 이 대역을 gateway 8080에 엽니다.
+#    base의 ingress-nginx 허용(allow-ingress-gateway)은 GKE에 없는 네임스페이스라 지웁니다.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: allow-gclb-to-gateway, namespace: rag}
+spec:
+  podSelector: {matchLabels: {app: gateway}}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - ipBlock: {cidr: 35.191.0.0/16}
+        - ipBlock: {cidr: 130.211.0.0/22}
+      ports: [{protocol: TCP, port: 8080}]
+---
+# 2) Workload Identity: rag-runner 계정을 쓰는 파드(retriever, orchestrator)는 토큰을
+#    GKE 메타데이터 서버에서 받습니다. 기본 거부 아래에서는 이 통신도 막히므로 엽니다.
+#    공식 문서("네트워크 정책과 GKE용 워크로드 아이덴티티 제휴" 절, 2026-11-25 확인)의 기준:
+#      https://docs.cloud.google.com/kubernetes-engine/docs/how-to/network-policy
+#    - 169.254.169.252/32 의 988·987  GKE 1.21.0-gke.1000 이상(일반 경로)
+#    - 169.254.169.254/32 의 80·8080  GKE Dataplane V2 클러스터
+#    - (참고) 1.21.0-gke.1000 미만은 127.0.0.1/32 의 988·987 — 지원이 끝난 버전이라 넣지 않았습니다.
+#    이 주소·포트가 막혀 있으면 자동 업그레이드 중에 장애가 날 수 있다고 문서가 경고합니다.
+#    이 저장소의 클러스터는 Dataplane V2로 만들므로 두 묶음을 모두 엽니다.
+#    - Google API(Secret Manager·Cloud Storage 등)는 HTTPS 443. 사설 대역은 제외합니다.
+#      더 좁히려면 FQDN 네트워크 정책(GKE Enterprise)이나 비공개 Google 액세스 대역을 씁니다.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: allow-workload-identity, namespace: rag}
+spec:
+  podSelector:
+    matchExpressions:
+      - {key: app, operator: In, values: [retriever, orchestrator]}
+  policyTypes: [Egress]
+  egress:
+    - to: [{ipBlock: {cidr: 169.254.169.252/32}}]
+      ports: [{protocol: TCP, port: 988}, {protocol: TCP, port: 987}]
+    - to: [{ipBlock: {cidr: 169.254.169.254/32}}]
+      ports: [{protocol: TCP, port: 80}, {protocol: TCP, port: 8080}]
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except: [10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16]
+      ports: [{protocol: TCP, port: 443}]
+---
+# 3) NodeLocal DNSCache를 켠 클러스터는 DNS 질의가 169.254.20.10으로 갑니다.
+#    base의 allow-dns(kube-system 네임스페이스)만으로는 이 주소가 열리지 않습니다.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: allow-node-local-dns, namespace: rag}
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+    - to: [{ipBlock: {cidr: 169.254.20.10/32}}]
+      ports: [{protocol: UDP, port: 53}, {protocol: TCP, port: 53}]

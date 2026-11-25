@@ -1,0 +1,22 @@
+# 결정 모델 오토스케일 (10.7절) — 큐 대기시간 p95 기준.
+# 선택 구성: KEDA와 Prometheus가 설치되어 있고 decision 서비스가
+# decision_queue_wait_seconds 히스토그램을 내보낼 때 적용합니다.
+# deploy/base·overlays의 kustomization에는 포함하지 않습니다.
+#   kubectl apply -n rag -f deploy/observability/keda-decision.yaml
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: {name: decision, namespace: rag}
+spec:
+  scaleTargetRef: {name: decision}
+  minReplicaCount: 1
+  maxReplicaCount: 6
+  pollingInterval: 15
+  cooldownPeriod: 120
+  triggers:
+    - type: prometheus
+      metadata:
+        serverAddress: http://prometheus.monitoring:9090
+        query: |
+          histogram_quantile(0.95,
+            sum(rate(decision_queue_wait_seconds_bucket[2m])) by (le))
+        threshold: "0.15"

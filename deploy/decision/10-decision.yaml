@@ -1,0 +1,82 @@
+# deploy/base/decision.yaml에 덧씌우는 패치(전략적 병합).
+# 컨테이너 decision(= decision-api, services/decision/main.py)은 이름으로 병합되고,
+# shim·vllm 컨테이너가 같은 파드에 추가됩니다. vLLM과 shim은 loopback(127.0.0.1)에만 엽니다.
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: decision, namespace: rag}
+spec:
+  replicas: 1
+  strategy: {rollingUpdate: {maxUnavailable: 0, maxSurge: 1}}
+  template:
+    metadata:
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+    spec:
+      nodeSelector: {cloud.google.com/gke-accelerator: nvidia-h100-80gb}
+      tolerations:
+        - {key: nvidia.com/gpu, operator: Equal, value: present, effect: NoSchedule}
+      securityContext: {runAsNonRoot: true, fsGroup: 1000}
+      containers:
+        - name: decision                     # decision-api. 이미지는 base·오버레이 값을 그대로 씁니다
+          ports: [{containerPort: 8080, name: http}]
+          env:
+            - {name: DECISION_UPSTREAM, value: "http://127.0.0.1:3001/v1"}
+            - {name: MAX_CONCURRENCY, value: "32"}
+            - {name: SHIM_TOKEN, valueFrom: {secretKeyRef: {name: rag-secrets, key: SHIM_TOKEN}}}
+          resources:
+            requests: {cpu: "500m", memory: "512Mi"}
+            limits: {cpu: "2", memory: "1Gi"}
+          startupProbe:
+            httpGet: {path: /v1/version, port: http}
+            periodSeconds: 10
+            failureThreshold: 60             # 모델 로드 최대 10분
+          readinessProbe:
+            httpGet: {path: /v1/version, port: http}
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: {path: /healthz, port: http}   # 프록시 자신만 봅니다(업스트림 지연으로 재시작하지 않게)
+            periodSeconds: 15
+            failureThreshold: 4
+        - name: shim
+          image: registry.example.com/rag/openjev-shim:0.1.0   # 직접 빌드: deploy/decision/shim/Dockerfile, make shim-image
+          securityContext: {runAsUser: 1000}
+          ports: [{containerPort: 3001, name: shim}]
+          env:
+            - {name: VLLM, value: "http://127.0.0.1:8000/v1"}
+            - {name: TOKENIZER, value: "/models/openjev"}
+            - {name: READOUT_T, value: "0.85"}
+            - {name: READOUT_NOUL_T, value: "1.829074"}
+            - {name: READOUT_NOUL_BIAS, value: "0"}
+            - {name: READOUT_TARGETED, value: "1"}
+            - {name: READOUT_INSTR_STYLE, value: "pyrepr"}
+            - {name: SHIM_STAGGER, value: "1"}
+            - {name: SHIM_TOKEN, valueFrom: {secretKeyRef: {name: rag-secrets, key: SHIM_TOKEN}}}
+          args: ["--host", "127.0.0.1", "--port", "3001"]
+          resources:
+            requests: {cpu: "200m", memory: "1Gi"}
+            limits: {cpu: "1", memory: "3Gi"}
+          volumeMounts: [{name: weights, mountPath: /models/openjev, readOnly: true}]
+        - name: vllm
+          image: vllm/vllm-openai:v0.29.0
+          securityContext: {runAsNonRoot: false}   # 공식 이미지는 root 권한으로 실행됩니다. 이 컨테이너만 예외
+          args:
+            - "--model=/models/openjev"
+            - "--served-model-name=qwen"
+            - "--host=127.0.0.1"
+            - "--port=8000"
+            - "--enable-prefix-caching"
+            - "--max-model-len=16384"
+            - "--gpu-memory-utilization=0.90"
+            - "--limit-mm-per-prompt={\"image\":1}"
+            - "--trust-remote-code"
+            - "--max-num-seqs=256"
+            - "--max-logprobs=64"
+            - "--gdn-prefill-backend=triton"
+            - "--quantization=fp8"
+          resources:
+            limits: {nvidia.com/gpu: "1", memory: "64Gi"}
+          volumeMounts: [{name: weights, mountPath: /models/openjev, readOnly: true}]
+      volumes:
+        - name: weights
+          persistentVolumeClaim: {claimName: openjev-weights, readOnly: true}

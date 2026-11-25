@@ -1,0 +1,8 @@
+# examples/ch11/05_pod_security_context.yaml
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities: {drop: ["ALL"]}
+  seccompProfile: {type: RuntimeDefault}

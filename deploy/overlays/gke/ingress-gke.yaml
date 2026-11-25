@@ -1,0 +1,22 @@
+# GKE: nginx Ingress를 GCE Ingress(+ManagedCertificate)로 바꿉니다.
+# 주석(kubernetes.io/ingress.class)과 spec.ingressClassName은 함께 쓸 수 없으므로
+# base의 ingressClassName과 nginx 전용 주석을 null로 지웁니다.
+# ManagedCertificate rag-cert는 도메인을 정한 뒤 따로 만듭니다.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: rag
+  annotations:
+    kubernetes.io/ingress.class: gce
+    networking.gke.io/managed-certificates: rag-cert
+    nginx.ingress.kubernetes.io/proxy-read-timeout: null
+    nginx.ingress.kubernetes.io/limit-rps: null
+spec:
+  ingressClassName: null
+  rules:
+    - host: rag.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend: {service: {name: gateway, port: {number: 80}}}

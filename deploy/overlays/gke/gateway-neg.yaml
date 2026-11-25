@@ -1,0 +1,9 @@
+# GCE Ingress 백엔드: 컨테이너 기반 부하 분산(NEG)을 명시하고, 상태 검사 경로를 정합니다.
+# 상태 검사는 35.191.0.0/16·130.211.0.0/22에서 파드 8080으로 옵니다(networkpolicy-gke.yaml).
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway
+  annotations:
+    cloud.google.com/neg: '{"ingress": true}'
+    cloud.google.com/backend-config: '{"default": "gateway-backendconfig"}'

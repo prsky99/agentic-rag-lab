@@ -1,0 +1,27 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+  - rag-runner-sa.yaml
+  - networkpolicy-gke.yaml          # 부하 분산기 진입·Workload Identity·NodeLocal DNS
+  - gateway-backendconfig.yaml
+  # External Secrets Operator를 설치하고 SecretStore(gcp-sm)를 만든 뒤 아래 두 줄의 주석을 풉니다.
+  # SecretStore 인증 예제(Workload Identity, IAM 바인딩 명령 포함)는 secret-store.example.yaml에 있습니다.
+  # 복사해 PROJECT·클러스터 이름을 바꾼 파일을 secret-store.yaml로 두고 함께 적용합니다.
+  # - secret-store.yaml
+  # - external-secret.yaml
+patches:
+  - path: decision-gpu.yaml
+  - path: ingress-gke.yaml
+  - path: service-accounts.yaml
+  - path: gateway-neg.yaml
+  - path: netpol-delete-nginx.yaml
+# 이미지 태그는 모두 고정합니다(latest 금지). 재현성 표는 README의 "재현성 정보"를 봐 주세요.
+images:
+  - {name: rag/orchestrator, newName: asia-northeast3-docker.pkg.dev/PROJECT/rag/orchestrator, newTag: harness-9f2c1ab}
+  - {name: rag/gateway, newName: asia-northeast3-docker.pkg.dev/PROJECT/rag/gateway, newTag: harness-9f2c1ab}
+  - {name: rag/retriever, newName: asia-northeast3-docker.pkg.dev/PROJECT/rag/retriever, newTag: "0.9.0"}
+  - {name: rag/reranker, newName: asia-northeast3-docker.pkg.dev/PROJECT/rag/reranker, newTag: "0.9.0"}
+  - {name: rag/generator, newName: asia-northeast3-docker.pkg.dev/PROJECT/rag/generator, newTag: "0.9.0"}
+  - {name: rag/guard, newName: asia-northeast3-docker.pkg.dev/PROJECT/rag/guard, newTag: "0.9.0"}
+  - {name: rag/decision, newName: asia-northeast3-docker.pkg.dev/PROJECT/rag/decision, newTag: "0.9.0"}
