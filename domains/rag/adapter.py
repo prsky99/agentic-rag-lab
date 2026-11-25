@@ -298,12 +298,34 @@ class RagDomain(Domain):
         missing = [kk for kk in self.REQUIRED_EXTRA if kk not in ex]
         if missing:
             v.append("extra missing: " + ",".join(missing))
-        for kk in ("cite_precision", "abstain_answerable", "abstain_unanswerable", "p95_ms",
-                   "error_rate"):
-            if kk in ex and not finite(ex[kk]):
-                v.append(f"extra {kk}={ex[kk]!r} is not a finite number")
+        # 비율은 0~1, 지연은 0 이상의 유한한 수여야 합니다(G04). None은 분모 0(미측정)입니다(G02).
+        # 인용·기권 비율의 None은 "해당 트라이얼 없음"이라 허용하고 가드가 따로 봅니다. 오류율·지연이
+        # None이면 채점한 산출물이 하나도 없다는 뜻이므로 쓰지 않습니다.
+        for kk in ("cite_precision", "abstain_answerable", "abstain_unanswerable", "error_rate"):
+            if kk in ex and ex[kk] is None:
+                if kk == "error_rate":
+                    v.append("extra error_rate unmeasured (채점한 산출물 0건)")
+            elif kk in ex and (not finite(ex[kk]) or not 0.0 <= ex[kk] <= 1.0):
+                v.append(f"extra {kk}={ex[kk]!r} is not a finite number in [0, 1]")
+        if "p95_ms" in ex and (not finite(ex["p95_ms"]) or ex["p95_ms"] < 0):
+            v.append(f"extra p95_ms={ex['p95_ms']!r} is not a finite number >= 0")
         if not finite(summary.S) or not finite(summary.C):
             v.append(f"S={summary.S!r} C={summary.C!r} is not finite")
+        else:
+            if not 0.0 <= summary.S <= 1.0:
+                v.append(f"S={summary.S!r} is not in [0, 1]")
+            if summary.C < 0:
+                v.append(f"C={summary.C!r} is negative")
+        if isinstance(summary.k, bool) or not isinstance(summary.k, int) or summary.k < 1:
+            v.append(f"k={summary.k!r} is not a positive integer")
+        # 버전·식별자: 비어 있지 않은 문자열이고, 비교 조건에 적힌 값과 같아야 합니다(G04).
+        cond = summary.conditions or {}
+        for kk, ck in (("evaluator", "evaluator"), ("judge", "judge"),
+                       ("goldenset_version", "goldenset")):
+            if kk in ex and (not isinstance(ex[kk], str) or not ex[kk]):
+                v.append(f"extra {kk}={ex[kk]!r} is not an identifier")
+            elif kk in ex and ck in cond and cond[ck] != ex[kk]:
+                v.append(f"extra {kk} {ex[kk]} != conditions {cond[ck]}")
         je = ex.get("judge_errors", 0)
         if isinstance(je, bool) or not isinstance(je, int) or je != 0:
             v.append(f"judge errors {je}")              # 심판 장애가 있으면 점수를 믿을 수 없습니다(R03)
@@ -355,15 +377,17 @@ class RagDomain(Domain):
                     abstain_unanswerable.append(abstained)
             per[tid] = TaskResult(rewards=rewards, tokens=toks, missing=missing)
 
+        # 분모가 0인 비율은 None(미측정)으로 둡니다(G02). 예전처럼 기권율 1.0·오류율 0으로 채우면
+        # 산출물이 전부 누락된 평가가 "정상 기권 100%·오류 0"처럼 보입니다. validity가 None을 거부합니다.
         extra = {
-            "cite_precision": round(cite_p / cite_t, 4) if cite_t else 0.0,
+            "cite_precision": round(cite_p / cite_t, 4) if cite_t else None,
             "abstain_answerable": round(sum(abstain_answerable) / len(abstain_answerable), 4)
-            if abstain_answerable else 0.0,
+            if abstain_answerable else None,
             "abstain_unanswerable": round(sum(abstain_unanswerable) / len(abstain_unanswerable), 4)
-            if abstain_unanswerable else 1.0,
-            "p95_ms": round(p95(latencies), 1),
+            if abstain_unanswerable else None,
+            "p95_ms": round(p95(latencies), 1) if runs else None,
             "goldenset_version": self.goldenset_version,
-            "error_rate": round(errors / runs, 4) if runs else 0.0,
+            "error_rate": round(errors / runs, 4) if runs else None,
             "evaluator": self.EVALUATOR_VERSION,
             "judge": judge_id(self._judge),
             # 심판 장애 트라이얼 수. 있으면 guards()가 후보를 채택하지 않습니다(R03).
@@ -440,27 +464,31 @@ class RagDomain(Domain):
         if v:
             return v
 
-        def g(key: str, default: float) -> tuple[float, float]:
-            return float(inc.get(key, default)), float(cand.get(key, default))
+        def g(key: str) -> tuple[float | None, float | None]:
+            # validity를 통과했으므로 값은 유한한 수이거나 None(분모 0, 미측정)입니다.
+            a, b = inc.get(key), cand.get(key)
+            if a is not None and b is None:
+                v.append(f"{key} unmeasured on candidate (분모 0)")
+            return (None if a is None else float(a)), (None if b is None else float(b))
 
-        i_cite, c_cite = g("cite_precision", 0.0)
-        if c_cite < i_cite - 0.02:
+        i_cite, c_cite = g("cite_precision")
+        if None not in (i_cite, c_cite) and c_cite < i_cite - 0.02:
             v.append(f"cite_precision {c_cite:.3f} < {i_cite:.3f}-0.02")
 
-        i_ans, c_ans = g("abstain_answerable", 0.0)
-        if c_ans > i_ans + 0.10:
+        i_ans, c_ans = g("abstain_answerable")
+        if None not in (i_ans, c_ans) and c_ans > i_ans + 0.10:
             v.append("over-abstention on answerable items")
 
         # 실패(실행 오류·운영 장애·예산 초과·알 수 없는 사유)가 늘어난 후보는 채택하지 않습니다(E05·R01)
-        i_err, c_err = g("error_rate", 0.0)
+        i_err, c_err = g("error_rate")
         if c_err > i_err + 0.01:
             v.append(f"error_rate {c_err:.3f} > {i_err:.3f}+0.01")
 
-        _, c_unans = g("abstain_unanswerable", 1.0)
-        if c_unans < 0.85:
+        _, c_unans = g("abstain_unanswerable")
+        if c_unans is not None and c_unans < 0.85:
             v.append(f"abstain on unanswerable {c_unans:.3f} < 0.85")
 
-        i_p95, c_p95 = g("p95_ms", 0.0)
+        i_p95, c_p95 = g("p95_ms")
         if i_p95 >= 50 and c_p95 > i_p95 * 1.25:
             v.append(f"p95 {c_p95:.0f}ms > 1.25x")
         return v

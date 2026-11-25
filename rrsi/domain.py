@@ -44,6 +44,7 @@ class EvalSummary:
     """한 job의 집계 결과.
 
     ``S``는 평균 보상, ``C``는 문항당 평균 정책 토큰입니다(7.4절의 S_hat, C_hat).
+    ``S``의 분모는 예상 트라이얼 전부(누락은 0점), ``C``의 분모는 비용을 잰 트라이얼입니다.
     """
 
     S: float
@@ -56,6 +57,12 @@ class EvalSummary:
     # 비교 조건(F01): 문항·반복 수·평가기·심판·고정 실행 조건. 후보가 바꿀 수 있는 하네스 값은 넣지 않습니다.
     conditions: dict[str, Any] = field(default_factory=dict)
     harness_tree: str = ""                 # 평가한 하네스 트리의 해시
+    # 산출물 완전성(G02): 예상 트라이얼(문항 수×k), 산출물이 있는 트라이얼, 비용을 잰 트라이얼.
+    # 누락 트라이얼은 보상 0으로 S에 들어가지만 C의 분모에서는 빠집니다. 그래서 cost_trials가 0이면
+    # C=0은 "0토큰"이 아니라 "비용 미측정"입니다. 이전 판 결과에는 이 값이 없습니다(0).
+    trials_expected: int = 0
+    trials_done: int = 0
+    cost_trials: int = 0
 
 
 class Domain:

@@ -1,0 +1,23 @@
+# 줄바꿈을 LF로 고정합니다. 골든셋 버전(파일 해시)과 셸 스크립트가 줄바꿈에 민감해서,
+# Windows에서 복제(core.autocrlf=true)하거나 압축으로 받아도 저장소와 같은 바이트가 되게 합니다.
+* text=auto eol=lf
+*.py text eol=lf
+*.sh text eol=lf
+*.json text eol=lf
+*.jsonl text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.md text eol=lf
+*.js text eol=lf
+*.toml text eol=lf
+*.txt text eol=lf
+*.env text eol=lf
+*.cfg text eol=lf
+Makefile text eol=lf
+Dockerfile text eol=lf
+LICENSE text eol=lf
+NOTICE text eol=lf
+*.png binary
+*.jpg binary
+*.gz binary
+*.zip binary

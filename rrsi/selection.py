@@ -1,6 +1,7 @@
 """선택 규칙 (7.3절, Algorithm 2).
 
-순서: 비교 조건(comparability) → 하드 가드 → 누락 비율 → 노이즈 하한(S* - δ) → 비용 규칙 → argmax.
+순서: 비교 조건(comparability) → 하드 가드 → 누락 비율 → 산출물 완전성 → 노이즈 하한(S* - δ)
+→ 비용 규칙 → argmax.
 δ는 "같은 하네스를 두 번 측정해도 생기는 차이"의 상한입니다. 이보다 작은 상승은
 증거가 아니라 잡음이므로 탈락시킵니다.
 """
@@ -65,6 +66,11 @@ def comparability(incumbent: EvalSummary, candidate: EvalSummary) -> list[str]:
 def decide(candidate: EvalSummary, incumbent: EvalSummary, delta: float,
            cfg: dict, guards: list[str], novelty: float = 0.0,
            s_star: float | None = None) -> Decision:
+    """후보 하나의 승격 여부.
+
+    dC는 현행 C에 대한 상대 변화입니다. 현행 C=0은 기준선 검사(모든 트라이얼 비용 측정)를 통과한
+    실제 0토큰일 때만 남으므로, 이때는 상대 비용을 정의할 수 없어 dC=0으로 두고 S만으로 판단합니다.
+    """
     dS = candidate.S - incumbent.S
     dC = ((candidate.C - incumbent.C) / incumbent.C) if incumbent.C else 0.0
 
@@ -76,6 +82,12 @@ def decide(candidate: EvalSummary, incumbent: EvalSummary, delta: float,
         return Decision(False, "guard: " + "; ".join(guards), dS, dC)
     if candidate.missing_frac > cfg.get("invalid_missing_frac", 0.1):
         return Decision(False, f"invalid: missing {candidate.missing_frac:.1%}", dS, dC)
+    # 승자는 다음 라운드의 기준선이 됩니다. 그래서 기준선과 같은 원칙(누락 0·모든 트라이얼 비용 측정)을
+    # 지킨 후보만 승격합니다(G02). 누락분은 C의 분모에서 빠지므로, 그대로 두면 비용 비교가 왜곡됩니다.
+    exp = candidate.trials_expected
+    if exp < 1 or candidate.trials_done != exp or candidate.cost_trials != exp:
+        return Decision(False, f"incomplete: trials {candidate.trials_done}/{exp}, "
+                               f"cost {candidate.cost_trials}/{exp} (승격은 누락 0만)", dS, dC)
     # 노이즈 보정 하한: 지금까지 관측된 최고점 S*에서 δ 넘게 떨어지면 탈락
     if s_star is not None and candidate.S < s_star - delta:
         return Decision(False, f"floor: S {candidate.S:.4f} < S* {s_star:.4f} - delta {delta:.4f}",

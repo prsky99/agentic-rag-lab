@@ -52,9 +52,22 @@ def job_problems(summary: dict, validity=None) -> list[str]:
     if isinstance(s, bool) or not isinstance(s, (int, float)) or \
             (isinstance(s, float) and not math.isfinite(s)) or not 0.0 <= s <= 1.0:
         out.append(f"S={s!r}가 0~1의 유한한 수가 아닙니다")
+    c = summary.get("C")
+    if isinstance(c, bool) or not isinstance(c, (int, float)) or \
+            (isinstance(c, float) and not math.isfinite(c)) or c < 0:
+        out.append(f"C={c!r}가 0 이상의 유한한 수가 아닙니다")
+    for key in ("k", "n"):
+        val = summary.get(key)
+        if isinstance(val, bool) or not isinstance(val, int) or val < 1:
+            out.append(f"{key}={val!r}가 양의 정수가 아닙니다")
     mf = summary.get("missing_frac")
-    if mf != 0 and mf != 0.0:
+    if isinstance(mf, bool) or mf != 0:
         out.append(f"누락 트라이얼 missing_frac={mf!r}")
+    # 트라이얼 수(G02)가 있으면 산출물·비용 측정이 예상 트라이얼과 모두 같아야 합니다.
+    exp = summary.get("trials_expected")
+    if exp is not None and not (summary.get("trials_done") == exp == summary.get("cost_trials")):
+        out.append(f"트라이얼 {summary.get('trials_done')!r}/{exp!r}, "
+                   f"비용 측정 {summary.get('cost_trials')!r}/{exp!r}")
     if not summary.get("conditions") or not summary.get("harness_tree"):
         out.append("비교 조건·하네스 해시 없음(이전 판 eval.json)")
     if validity is not None and not out:

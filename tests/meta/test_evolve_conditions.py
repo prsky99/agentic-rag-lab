@@ -43,12 +43,14 @@ def _extra(rag) -> dict:
 
 
 def _pair(rag, inc_extra=None, cand_extra=None, inc_cond=None, cand_cond=None):
-    cond = {"ids": ["q_0001"], "k": 2, "evaluator": rag.EVALUATOR_VERSION, "judge": "j",
+    cond = {"ids": ["q_0001"], "k": 2, "evaluator": rag.EVALUATOR_VERSION,
+            "judge": "local/local-fallback/same-v1",
             "goldenset": rag.goldenset_version, "runtime": {"decision": {"mode": "local"}}}
+    full = {"n": 1, "missing_frac": 0.0, "trials_expected": 2, "trials_done": 2, "cost_trials": 2}
     inc = EvalSummary(S=0.8, C=100.0, k=2, extra=inc_extra or _extra(rag),
-                      conditions=inc_cond or cond)
+                      conditions=inc_cond or cond, **full)
     cand = EvalSummary(S=0.85, C=100.0, k=2, extra=cand_extra or _extra(rag),
-                       conditions=cand_cond or copy.deepcopy(cond))
+                       conditions=cand_cond or copy.deepcopy(cond), **full)
     return inc, cand
 
 
@@ -286,7 +288,8 @@ def test_f02_same_conditions_calibrate_and_record_fingerprint(tmp_path):
 
 
 def test_f02_calibration_without_fingerprint_is_not_reused(tmp_path):
-    (tmp_path / "calibration.json").write_text(json.dumps({"delta": 0.5, "n": 3}), encoding="utf-8")
+    (tmp_path / "calibration.json").write_text(
+        json.dumps({"delta": 0.5, "n": 3, "z": 2.0, "sd_null": 0.25}), encoding="utf-8")
     d, src = loop.effective_delta(tmp_path, {"delta_prior": 0.011}, {"k": 2}, "h1")
     assert d == 0.011 and "stale" in src
 

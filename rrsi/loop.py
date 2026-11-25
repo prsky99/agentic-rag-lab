@@ -8,9 +8,15 @@
 심판·골든셋·고정 실행 조건)이나 현행 하네스 해시가 지금과 다르면, 이전 점수와 S*는 다른 조건의
 값이므로 버리고 기준선을 새로 잽니다. 기준선 평가에 심판 장애·필수 값 누락이 있으면 기준선으로
 쓰지 않고 멈춥니다.
+
+기준선은 누락 0이 원칙입니다(G02). 예상 문항×k 트라이얼이 모두 산출물을 내고 모두 비용을 쟀어야
+등록합니다. 그 수(n·missing_frac·trials_expected·trials_done·cost_trials)를 frontier에 남겨 재개할
+때 다시 검사하므로, 이전 판이나 잘못 등록된 frontier는 이어 쓰지 않습니다. git 모드에서는 기준선을
+재기 전에 작업 트리가 깨끗하고 evolve/rag가 HEAD와 같은지 확인합니다(G03).
 """
 from __future__ import annotations
 
+import math
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -19,8 +25,8 @@ from typing import Any
 from . import critic
 from ._log import append_jsonl, log, read_json, write_json
 from .domain import Domain, EvalSummary
-from .evaluate import evaluate, p95_latency
-from .gitops import Workspace
+from .evaluate import evaluate, p95_latency, summary_problems
+from .gitops import Workspace, WorkspaceError
 from .history import History
 from .propose import Proposal, build_proposer, commit_edits
 from .schedule import edit_budget
@@ -62,11 +68,48 @@ def calibration_stale(calib: dict, conditions: dict | None, harness_tree: str | 
     return out
 
 
+def calibration_problems(calib: dict) -> list[str]:
+    """저장된 calibration.json 값이 스스로 맞는지(G04). 비어 있으면 값으로는 쓸 수 있습니다.
+
+    δ·z·sd_null은 유한한 양수(δ는 S의 범위 0~1 안), n은 3 이상의 정수, δ = z·sd_null이어야 하고
+    지문에는 하네스 해시(문자열)와 비교 조건(사전)이 있어야 합니다.
+    """
+    from .calibrate import MIN_RUNS
+
+    def pos(x) -> bool:
+        return isinstance(x, (int, float)) and not isinstance(x, bool) and math.isfinite(x) and x > 0
+
+    out = []
+    delta, z, sd, n = (calib.get(kk) for kk in ("delta", "z", "sd_null", "n"))
+    if not pos(delta) or delta > 1.0:
+        out.append(f"delta={delta!r}가 (0, 1]의 유한한 수가 아닙니다")
+    if not pos(z):
+        out.append(f"z={z!r}가 유한한 양수가 아닙니다")
+    if not pos(sd):
+        out.append(f"sd_null={sd!r}가 유한한 양수가 아닙니다")
+    if isinstance(n, bool) or not isinstance(n, int) or n < MIN_RUNS:
+        out.append(f"n={n!r}가 {MIN_RUNS} 이상의 정수가 아닙니다")
+    if not out and abs(delta - z * sd) > 1e-4:
+        out.append(f"delta {delta} != z {z} × sd_null {sd}")
+    fp = calib.get("fingerprint")
+    if isinstance(fp, dict) and fp and (not isinstance(fp.get("harness_tree"), str)
+                                        or not isinstance(fp.get("conditions"), dict)):
+        out.append("fingerprint 형식 오류")
+    return out
+
+
 def effective_delta(runs_dir: Path, cfg: dict, conditions: dict | None = None,
                     harness_tree: str | None = None) -> tuple[float, str]:
     calib = read_json(Path(runs_dir) / "calibration.json", {}) or {}
+    if not isinstance(calib, dict):
+        calib = {}
     delta = calib.get("delta")
     if isinstance(delta, (int, float)) and not isinstance(delta, bool) and delta > 0:
+        bad = calibration_problems(calib)
+        if bad:
+            # 비정상 보정값(무한대·범위 밖·z·sd_null과 불일치)은 쓰지 않습니다. 사전값과 진단을 남깁니다.
+            return (float(cfg.get("delta_prior", 0.011)),
+                    f"prior; calibration invalid ({'; '.join(bad)[:160]}) → calibrate 다시 실행")
         stale = calibration_stale(calib, conditions, harness_tree)
         if not stale:
             return float(delta), "calibrated"
@@ -77,11 +120,40 @@ def effective_delta(runs_dir: Path, cfg: dict, conditions: dict | None = None,
 
 
 def _summary_from_frontier(frontier: dict, cfg: dict) -> EvalSummary:
+    """저장된 현행 기록을 그대로 옮깁니다. 값 검사는 ``summary_problems``·``validity``가 합니다.
+
+    없는 값은 그럴듯한 기본값으로 채우지 않습니다(G02). 이전 판 frontier에 n·트라이얼 수가 없으면
+    0이 되어 재개 검사에서 걸립니다. 누락 비율이 없으면 1.0(전부 누락)으로 봅니다.
+    """
     inc = (frontier or {}).get("incumbent") or {}
-    return EvalSummary(S=float(inc.get("S", 0.0)), C=float(inc.get("C", 0.0)),
-                       k=int(inc.get("k", cfg.get("k", 2))), extra=dict(inc.get("extra") or {}),
+    return EvalSummary(S=inc.get("S"), C=inc.get("C"), k=inc.get("k"),
+                       extra=dict(inc.get("extra") or {}),
                        conditions=dict(inc.get("conditions") or {}),
-                       harness_tree=str(inc.get("harness_tree") or ""))
+                       harness_tree=str(inc.get("harness_tree") or ""),
+                       n=inc.get("n", 0), missing_frac=inc.get("missing_frac", 1.0),
+                       trials_expected=inc.get("trials_expected", 0),
+                       trials_done=inc.get("trials_done", 0),
+                       cost_trials=inc.get("cost_trials", 0))
+
+
+def _incumbent_record(t: int, commit: str, job: str, summary: EvalSummary) -> dict:
+    """frontier의 현행 기록. 재개할 때 다시 검사할 완전성 값(G02)을 함께 남깁니다."""
+    return {
+        "t": t,
+        "commit": commit,
+        "harness_tree": summary.harness_tree,
+        "job": job,
+        "S": round(summary.S, 6),
+        "C": round(summary.C, 2),
+        "k": summary.k,
+        "n": summary.n,
+        "missing_frac": round(summary.missing_frac, 4),
+        "trials_expected": summary.trials_expected,
+        "trials_done": summary.trials_done,
+        "cost_trials": summary.cost_trials,
+        "extra": summary.extra,
+        "conditions": summary.conditions,
+    }
 
 
 def _record(history: History, t: int, proposal: Proposal, summary: EvalSummary | None,
@@ -108,32 +180,27 @@ def _record(history: History, t: int, proposal: Proposal, summary: EvalSummary |
 
 def baseline(domain: Domain, root: Path, runs_dir: Path, cfg: dict, job: str) -> dict:
     ids = domain.evolve_ids()
+    ws = Workspace(root, runs_dir, f"domains/{domain.name}/harness")
+    # git 모드: 후보는 커밋에서 갈라지므로, 커밋하지 않은 변경이 있으면 재지 않습니다(G03).
+    ws.require_clean()
+    ws.ensure_baseline()
     summary = evaluate(domain, root, runs_dir, job, ids, int(cfg["k"]))
-    # 기준선으로 쓸 수 있는 평가인지 먼저 봅니다. 심판 장애·필수 값 누락이면 frontier를 쓰지 않습니다(F01).
-    problems = list(domain.validity(summary))
+    # 기준선으로 쓸 수 있는 평가인지 먼저 봅니다. 산출물 누락·비용 미측정·범위 밖 값(G02·G04),
+    # 심판 장애·필수 값 누락(F01)이면 frontier를 쓰지 않습니다.
+    problems = summary_problems(summary, ids, int(cfg["k"]))
+    problems += list(domain.validity(summary))
     if not summary.conditions:
         problems.append("conditions missing")
     if problems:
-        log(domain.name, f"baseline {job} 거부: {'; '.join(problems)[:200]}")
+        log(domain.name, f"baseline {job} 거부: {'; '.join(problems)[:300]}")
         raise BaselineInvalid("; ".join(problems))
-    ws = Workspace(root, runs_dir, f"domains/{domain.name}/harness")
     delta, src = effective_delta(runs_dir, cfg, summary.conditions, summary.harness_tree)
     old = read_json(runs_dir / "frontier.json", {}) or {}
     rounds_done = int(old.get("rounds_done", 0) or 0)   # 라운드 번호는 기준선을 새로 잡아도 이어 갑니다(F05)
     commit = ws.head_commit()
     frontier = {
         "domain": domain.name,
-        "incumbent": {
-            "t": rounds_done,
-            "commit": commit,
-            "harness_tree": summary.harness_tree,
-            "job": job,
-            "S": round(summary.S, 6),
-            "C": round(summary.C, 2),
-            "k": summary.k,
-            "extra": summary.extra,
-            "conditions": summary.conditions,
-        },
+        "incumbent": _incumbent_record(rounds_done, commit, job, summary),
         "S_star": round(summary.S, 6),
         "baseline_harness_tree": summary.harness_tree,
         "rounds_done": rounds_done,
@@ -165,7 +232,11 @@ def resume_problems(domain: Domain, root: Path, ws: Workspace, frontier: dict, c
             out.append("비교 조건이 바뀌었습니다: " + ",".join(diff))
     if inc.get("harness_tree") != ws.tree_hash():
         out.append("현행 하네스가 frontier의 harness_tree와 다릅니다")
-    out += [f"기준선 {x}" for x in domain.validity(_summary_from_frontier(frontier, cfg))]
+    saved = _summary_from_frontier(frontier, cfg)
+    # 저장된 기준선도 등록할 때와 같은 검사를 다시 받습니다(G02·G04). 잘못 등록된 기준선은 이어 쓰지 않습니다.
+    out += [f"기준선 {x}" for x in summary_problems(saved, ids, int(cfg["k"]))]
+    if not out:
+        out += [f"기준선 {x}" for x in domain.validity(saved)]
     return out
 
 
@@ -173,6 +244,9 @@ def run_rounds(domain: Domain, root: Path, runs_dir: Path, cfg: dict, T: int) ->
     cfg_full = load_config(root, domain)
     ws = Workspace(root, runs_dir, f"domains/{domain.name}/harness")
     ids = domain.evolve_ids()
+    # git 모드: 커밋하지 않은 변경이 있거나 evolve/rag가 HEAD와 다르면 시작하지 않습니다(G03).
+    ws.require_clean()
+    ws.ensure_baseline()
     frontier = read_json(runs_dir / "frontier.json", {}) or {}
     if not frontier:
         log(domain.name, "frontier 없음 → baseline 먼저 실행")
@@ -209,6 +283,13 @@ def run_rounds(domain: Domain, root: Path, runs_dir: Path, cfg: dict, T: int) ->
         for label in [chr(ord("A") + j) for j in range(int(cfg_full["m"]))]:
             name = f"r{t}{label}"
             cand_root = ws.candidate(name)
+            # 후보 편집 전: 후보가 출발한 하네스가 기준선 하네스와 같은지 확인합니다(G03).
+            start_tree = Workspace(cand_root, runs_dir, ws.harness_rel).tree_hash()
+            if start_tree != frontier["incumbent"].get("harness_tree"):
+                ws.cleanup(cand_root)
+                raise WorkspaceError(
+                    f"{name}: 후보 출발 하네스 {start_tree}가 기준선 하네스 "
+                    f"{frontier['incumbent'].get('harness_tree')}와 다릅니다 → 비교를 멈춥니다")
             try:
                 proposal = proposer.propose(cand_root, name, b_t, t, exclude=used)
                 used |= {e.key for e in proposal.edits}
@@ -270,19 +351,19 @@ def run_rounds(domain: Domain, root: Path, runs_dir: Path, cfg: dict, T: int) ->
             accepted = bool(winner and winner[0] == name)
             commit = ""
             if accepted and cand_root is not None:
-                commit = ws.promote(cand_root, f"rrsI {domain.name} t={t}: "
-                                               f"{proposal.note}; {proposal.components}")
-                frontier["incumbent"] = {
-                    "t": t + 1,
-                    "commit": commit,
-                    "harness_tree": ws.tree_hash(),
-                    "job": name,
-                    "S": round(summary.S, 6),
-                    "C": round(summary.C, 2),
-                    "k": summary.k,
-                    "extra": summary.extra,
-                    "conditions": summary.conditions,
-                }
+                try:
+                    commit = ws.promote(cand_root, f"rrsI {domain.name} t={t}: "
+                                                   f"{proposal.note}; {proposal.components}")
+                except WorkspaceError as exc:
+                    # 승격 커밋이 실패했습니다. 성공으로 기록하지 않고 현행을 그대로 둡니다(G03).
+                    log(domain.name, f"{name}: {exc}")
+                    _record(history, t, proposal, summary, False, f"promote failed: {exc}"[:200],
+                            "", d.delta_S if d else None, d.delta_C if d else None, run_id=run_id)
+                    ws.cleanup(cand_root)
+                    winner = None
+                    continue
+                frontier["incumbent"] = _incumbent_record(t + 1, commit, name, summary)
+                frontier["incumbent"]["harness_tree"] = ws.tree_hash()
                 frontier["S_star"] = round(max(float(frontier.get("S_star", 0.0)),
                                                summary.S), 6)
                 frontier.setdefault("trajectory", []).append(

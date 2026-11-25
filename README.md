@@ -5,17 +5,26 @@
 나오는 코드와 매니페스트·시험을 이 저장소 하나에 모았습니다. 본문 코드 블록 첫 줄의
 `# 경로` 주석이 이 저장소 안의 파일 경로입니다.
 
-저장소 받기(둘 중 하나):
+저장소 받기 — **책과 같은 버전은 태그 `v1.0.0`입니다**(기본 브랜치 `main`은 출간 뒤 정오표·개선이
+이어지는 곳이라 책과 달라질 수 있습니다). 둘 중 하나로 받으세요.
 
 ```bash
-git clone https://github.com/prsky99/agentic-rag-lab.git    # 1) 복제 — git 작업 트리
+git clone --branch v1.0.0 https://github.com/prsky99/agentic-rag-lab.git   # 1) 복제 — git 작업 트리
 cd agentic-rag-lab
-# 2) 또는 저장소 화면의 Code → Download ZIP으로 내려받아 풉니다
+# 2) 또는 Releases 화면의 v1.0.0 릴리스에서 agentic-rag-lab-v1.0.0.zip을 내려받아 풉니다.
+#    릴리스 설명에 적힌 SHA-256 값과 받은 파일을 대조해 주세요.
 ```
+
+모든 명령은 저장소 루트 폴더(복제했거나 압축을 푼 `agentic-rag-lab/`)에서 실행합니다.
+줄바꿈은 `.gitattributes`로 LF에 고정되어 있습니다. 골든셋 버전(파일 해시)과 셸 스크립트가
+줄바꿈에 민감하므로, 파일을 편집기로 열어 저장할 때 CRLF로 바꾸지 않도록 주의해 주세요.
 
 ZIP으로 받은 폴더는 git 작업 트리가 아니므로, 진화 실행(`rrsi.py ... run`)이 후보마다
 `git worktree` 대신 폴더 복사를 쓰는 복사 모드(`workspace=copy`)로 동작합니다(본문 7.5절·부록 A.7).
 승격을 커밋으로 남기려면 `git init && git add -A && git commit -m init`을 먼저 실행해 주세요.
+복제한 저장소(git 모드)에서는 후보가 커밋에서 갈라지므로 하네스를 고쳤다면 커밋한 뒤 진화를 실행합니다.
+커밋하지 않은 변경이 있거나 `evolve/rag` 브랜치가 HEAD와 갈라져 있으면(`rrsi/gitops.py`의
+`require_clean`·`ensure_baseline`) 실행이 이유와 처치 명령을 출력하고 멈춥니다.
 
 - 하네스(G1→검색→G2→생성→G3→G4)가 **실제로 돈다**: kind 없이도 로컬 모드로 질의 1건이
   끝까지 흐릅니다.
@@ -50,11 +59,11 @@ python3 tests/local_verify.py            # 다섯 시나리오(클러스터 없�
 python3 -m eval.recall_by_type           # 3장: 질문 유형별 재현율
 ```
 
-**1-B. 전체 설치 후 전체 시험·회귀 평가** — 격리·인젝션·장애·평가 무결성 시험 313건(부록 A.6), 5절 회귀 평가
+**1-B. 전체 설치 후 전체 시험·회귀 평가** — 격리·인젝션·장애·평가 무결성 시험 340건(부록 A.6), 5절 회귀 평가
 
 ```bash
 pip install -r requirements.txt pytest==8.3.4   # 전체 설치 + 시험 도구(requirements.txt에는 pytest가 없음)
-python3 -m pytest tests -q -rs                  # 313건 수집, 건너뛴 이유도 출력
+python3 -m pytest tests -q -rs                  # 340건 수집, 건너뛴 이유도 출력
 make eval                                       # 회귀 부분집합 평가(5절)
 ```
 
@@ -424,7 +433,7 @@ python3 eval/bootstrap_delta.py --jobs base1,base2,base3   # 9.6절: 위 4절 ba
 ## 6. 테스트
 
 ```bash
-python3 -m pytest tests -q     # 수집 313건(전체 설치 기준): 격리 13 + 등급 정책 3 + 인젝션 5 + 장애 3 + 요청 경로 87 + 평가 무결성 177 + 제안자·훈련 9 + 청커 1 + Qdrant·임베딩 13 + OTel 2
+python3 -m pytest tests -q     # 수집 340건(전체 설치 기준): 격리 13 + 등급 정책 3 + 인젝션 5 + 장애 3 + 요청 경로 87 + 평가 무결성 204 + 제안자·훈련 9 + 청커 1 + Qdrant·임베딩 13 + OTel 2
 python3 tests/local_verify.py  # 정상·기권·인젝션·테넌트·결정모델다운
 bash tests/verify.sh           # kind에서 같은 다섯 가지
 ```
@@ -433,16 +442,16 @@ bash tests/verify.sh           # kind에서 같은 다섯 가지
 격리 테스트가 그것을 잡는지 확인합니다. 테스트가 통과하는 것과 테스트가 의미 있는
 것은 다릅니다(3.6절).
 
-수집되는 시험은 313건이고, 통과·건너뜀 수는 설치 환경에 따라 다릅니다(부록 A.6).
+수집되는 시험은 340건이고, 통과·건너뜀 수는 설치 환경에 따라 다릅니다(부록 A.6).
 
 | 설치 | 결과 |
 |---|---|
-| `pip install -r requirements.txt pytest==8.3.4`(전체) | 313건 모두 실행 — 임베딩 모델이 캐시에 없으면 `312 passed, 1 skipped` |
+| `pip install -r requirements.txt pytest==8.3.4`(전체) | 340건 모두 실행 — 임베딩 모델이 캐시에 없으면 `339 passed, 1 skipped` |
 | `pip install pyyaml pytest`(최소) | 패키지가 없는 시험은 건너뛰고, `httpx`가 없어 참조 오케스트레이터를 불러오지 못하는 시험 1건이 실패 |
 | 최소 + `httpx==0.28.1` | 실패 없이 일부 건너뜀 |
 | CI(`pyyaml pytest fastapi httpx pyjwt`) | 실패 없이 qdrant·fastembed·opentelemetry 시험을 건너뜀 |
 
-313건을 모두 보려면 `pip install -r requirements.txt pytest==8.3.4`를 먼저 실행해 주세요(`requirements.txt`에는 pytest가 없습니다). 건너뛴 이유는 `pytest -rs`로 확인합니다.
+340건을 모두 보려면 `pip install -r requirements.txt pytest==8.3.4`를 먼저 실행해 주세요(`requirements.txt`에는 pytest가 없습니다). 건너뛴 이유는 `pytest -rs`로 확인합니다.
 실제 임베딩 모델로 33개 청크를 색인하고 검색하는 시험(`tests/qdrant/test_embedding_model.py`)은
 모델 파일이 캐시에 있을 때만 실행합니다. `python -m eval.index --qdrant-url :memory:`를 한 번
 실행하면 기본 모델(약 0.22GB)이 캐시에 들어가고, `RUN_EMBED_DOWNLOAD=1`을 주면 시험이 직접 내려받습니다.

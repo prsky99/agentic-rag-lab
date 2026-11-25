@@ -13,6 +13,7 @@ from . import calibrate as calibrate_mod
 from . import loop
 from ._log import log, read_json, write_json
 from .domain import EvalSummary
+from .gitops import WorkspaceError
 
 
 def load_domain(root: Path, name: str):
@@ -57,7 +58,10 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "baseline":
         try:
             loop.baseline(domain, root, runs_dir, cfg, args.job)
-        except loop.BaselineInvalid:             # 심판 장애·필수 값 누락: frontier를 쓰지 않습니다(F01)
+        except loop.BaselineInvalid:             # 산출물 누락·심판 장애·필수 값 누락: frontier를 쓰지 않습니다
+            return 1
+        except WorkspaceError as exc:            # git 모드: 커밋하지 않은 변경·evolve/rag 불일치(G03)
+            log(domain.name, f"baseline: {exc}")
             return 1
         return 0
 
@@ -67,6 +71,9 @@ def main(argv: list[str] | None = None) -> int:
             loop.run_rounds(domain, root, runs_dir, cfg, T)
         except loop.BaselineInvalid:
             log(domain.name, "run: 기준선을 쓸 수 없어 비교·승격을 멈춥니다")
+            return 1
+        except WorkspaceError as exc:
+            log(domain.name, f"run: {exc}")
             return 1
         return 0
 
