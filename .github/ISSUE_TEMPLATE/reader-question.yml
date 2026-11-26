@@ -1,0 +1,96 @@
+name: 독자 문의
+description: 실습 중 막힌 부분, 환경 설정, 오탈자를 알려 주세요.
+title: "[독자 문의] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        실습 저장소를 이용해 주셔서 고맙습니다. 아래 항목을 채워 주시면 원인을 좁히는 데 큰 도움이 됩니다.
+
+        - 책과 같은 코드는 태그 `v1.0.0`입니다. `git clone --branch v1.0.0 https://github.com/prsky99/agentic-rag-lab.git`로 받으셨는지 먼저 확인해 주세요.
+        - 장별 태그 `ch01`~`ch12`는 모두 같은 커밋(v1.0.0)을 가리킵니다. `git checkout ch07`처럼 장 단위로 확인할 때 쓰시면 됩니다.
+        - 토큰·비밀번호·개인정보·내부 주소는 붙이지 마세요. 오류 메시지에 섞여 있으면 가려서 올려 주세요.
+  - type: dropdown
+    id: kind
+    attributes:
+      label: 문의 유형
+      description: 가장 가까운 항목을 골라 주세요.
+      options:
+        - 실습 실행 오류
+        - 환경·설치 질문
+        - 오탈자·개선 제안
+    validations:
+      required: true
+  - type: dropdown
+    id: chapter
+    attributes:
+      label: 책 장
+      description: 문제가 생긴 장을 골라 주세요. 여러 장이면 가장 처음 막힌 장을 적어 주세요.
+      options:
+        - ch01
+        - ch02
+        - ch03
+        - ch04
+        - ch05
+        - ch06
+        - ch07
+        - ch08
+        - ch09
+        - ch10
+        - ch11
+        - ch12
+        - 부록 또는 공통(환경 설정, 저장소 받기)
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: OS
+      description: 운영체제와 버전을 적어 주세요.
+      placeholder: "예) Windows 11 24H2, macOS 15.1(Apple Silicon), Ubuntu 24.04"
+  - type: input
+    id: python
+    attributes:
+      label: Python 버전
+      description: "`python3 --version` 결과를 적어 주세요."
+      placeholder: "예) Python 3.12.4"
+  - type: input
+    id: kubernetes
+    attributes:
+      label: Kubernetes 버전
+      description: "kind·minikube 등 로컬 클러스터 버전(`kubectl version`)을 적어 주세요. 로컬 모드만 쓰셨다면 '해당 없음'으로 적어 주세요."
+      placeholder: "예) kind v0.24.0 / Kubernetes v1.31.0, 또는 로컬 모드(클러스터 없음)"
+  - type: textarea
+    id: commands
+    attributes:
+      label: 실행한 명령어
+      description: 문제가 생긴 명령을 실행한 순서대로 적어 주세요.
+      placeholder: |
+        예)
+        git clone --branch v1.0.0 https://github.com/prsky99/agentic-rag-lab.git
+        cd agentic-rag-lab
+        python3 -m pytest tests -q
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: error
+    attributes:
+      label: 오류 메시지·로그
+      description: 마지막 부분부터 필요한 만큼 붙여 주세요. 토큰·비밀번호·개인정보는 지우고 올려 주세요.
+      render: shell
+  - type: textarea
+    id: details
+    attributes:
+      label: 추가 설명
+      description: 기대한 결과와 실제로 일어난 일, 이미 해 본 조치를 적어 주세요.
+      placeholder: "예) 7장 진화 실행에서 '커밋하지 않은 변경이 있습니다'로 멈춥니다. git status는 비어 있습니다."
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: 올리기 전 확인
+      options:
+        - label: 저장소를 `v1.0.0` 태그(또는 Releases의 `agentic-rag-lab-v1.0.0.zip`)로 받았습니다.
+          required: true
+        - label: 오류 메시지에 토큰·비밀번호·개인정보가 남아 있지 않은지 확인했습니다.
+          required: true
